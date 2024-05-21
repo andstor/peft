@@ -352,8 +352,20 @@ def set_peft_model_state_dict(
     )
     load_result = model.load_state_dict(peft_model_state_dict, strict=False)
     if config.is_prompt_learning:
+        weight = None
+        try:
+            weight = peft_model_state_dict["prompt_embeddings"]
+        except KeyError:
+            # Try to recover from "prompt_encoder"
+            for key in peft_model_state_dict.keys():
+                if key.startswith("prompt_encoder"):
+                    weight = peft_model_state_dict[key]
+                    break
+
+        if weight is None:
+            raise ValueError("Could not find prompt embeddings in the state dict.")
         model.prompt_encoder[adapter_name].embedding.load_state_dict(
-            {"weight": peft_model_state_dict["prompt_embeddings"]}, strict=True
+            {"weight": weight}, strict=True
         )
 
     if config.peft_type == PeftType.MULTITASK_PROMPT_TUNING:
